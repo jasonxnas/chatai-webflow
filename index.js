@@ -13,28 +13,33 @@ const client = new OpenAI({
 // Chatwoot webhook endpoint
 app.post("/chatwoot-bot", async (req, res) => {
   try {
-    const message = req.body.content || "Hello";
+    const userMessage = req.body.content || "Hello";
 
-    // Generate AI response
+    // Generate AI response with gpt-3.5-turbo (fast)
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: "You are a helpful, friendly customer support AI for the company website." },
-        { role: "user", content: message }
-      ]
+        {
+          role: "system",
+          content: "You are a concise and friendly support assistant for Cenotrades. Answer clearly and briefly."
+        },
+        {
+          role: "user",
+          content: userMessage
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 300
     });
 
     const reply = completion.choices[0].message.content;
 
-    // Respond in Chatwoot's expected format
-    res.json({
-      content: reply
-    });
-  } catch (err) {
-    console.error("Error:", err);
-    res.json({
-      content: "Sorry, I'm having trouble responding right now."
-    });
+    // Respond immediately in Chatwoot format
+    res.json({ content: reply });
+
+  } catch (error) {
+    console.error("AI Bot error:", error);
+    res.json({ content: "Sorry, I am having trouble responding right now." });
   }
 });
 
