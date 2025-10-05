@@ -1,45 +1,71 @@
 import express from "express";
 import bodyParser from "body-parser";
 import OpenAI from "openai";
+import fetch from "node-fetch";
 
 const app = express();
 app.use(bodyParser.json());
 
-// Initialize OpenAI client
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const chatwootUrl = process.env.CHATWOOT_URL; // e.g., https://your-chatwoot.herokuapp.com
+const chatwootToken = process.env.CHATWOOT_API_TOKEN; // personal access token
 
-// Chatwoot webhook endpoint
 app.post("/chatwoot-bot", async (req, res) => {
   try {
-    const userMessage = req.body.content || "Hello";
+    const { content: userMessage, id: messageId, inbox: { id: inboxId }, conversation } = req.body;
+    const conversationId = conversation.id;
 
-    // Generate AI response with gpt-3.5-turbo (fast)
-    const completion = await client.chat.completions.create({
+    // 1️⃣ Send immediate placeholder reply
+    await fetch(`${chatwootUrl}/api/v1/accounts/1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api_access_token": chatwootToken
+      },
+      body: JSON.stringify({
+        content: "🤖 AI is thinking...",
+        message_type: 1, // incoming message
+        private: false,
+        inbox_id: inboxId,
+        conversation_id: conversationId
+      })
+    });
+
+    // 2️⃣ Generate AI reply
+    const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
-        {
-          role: "system",
-          content: "You are a concise and friendly support assistant for Cenotrades. Answer clearly and briefly."
-        },
-        {
-          role: "user",
-          content: userMessage
-        }
+        { role: "system", content: "You are a concise, friendly support assistant for Cenotrades. Answer clearly and briefly." },
+        { role: "user", content: userMessage }
       ],
       temperature: 0.7,
       max_tokens: 300
     });
 
-    const reply = completion.choices[0].message.content;
+    const aiReply = completion.choices[0].message.content;
 
-    // Respond immediately in Chatwoot format
-    res.json({ content: reply });
+    // 3️⃣ Send actual AI reply
+    await fetch(`${chatwootUrl}/api/v1/accounts/1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api_access_token": chatwootToken
+      },
+      body: JSON.stringify({
+        content: aiReply,
+        message_type: 1,
+        private: false,
+        inbox_id: inboxId,
+        conversation_id: conversationId
+      })
+    });
 
-  } catch (error) {
-    console.error("AI Bot error:", error);
-    res.json({ content: "Sorry, I am having trouble responding right now." });
+    // 4️⃣ Respond quickly to Chatwoot webhook
+    res.json({ content: "" });
+
+  } catch (err) {
+    console.error("AI Bot error:", err);
+    res.json({ content: "Sorry, something went wrong." });
   }
 });
 
