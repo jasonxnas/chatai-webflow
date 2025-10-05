@@ -14,13 +14,12 @@ app.post("/chatwoot-bot", async (req, res) => {
   try {
     const userMessage = req.body.content || "Hello";
 
-    // Generate AI reply
     const completion = await client.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a concise, friendly support assistant for Cenotrades. Answer clearly and briefly."
+          content: "You are a concise, friendly support assistant for Cenotrades."
         },
         {
           role: "user",
@@ -28,16 +27,12 @@ app.post("/chatwoot-bot", async (req, res) => {
         }
       ],
       temperature: 0.7,
-      max_tokens: 300
+      max_tokens: 200
     });
 
     const reply = completion.choices[0].message.content;
 
-    // Respond in Chatwoot expected format
-    res.json({
-      content: reply
-    });
-
+    res.json({ content: reply });
   } catch (err) {
     console.error("AI Bot error:", err);
     res.json({ content: "Sorry, I’m having trouble responding right now." });
