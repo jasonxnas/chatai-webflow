@@ -9,40 +9,44 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Chatwoot webhook endpoint
+// ✅ Quick response and timeout handling
 app.post("/chatwoot-bot", async (req, res) => {
-  try {
-    const userMessage = req.body.content || "Hello";
+  const userMessage = req.body.content?.trim() || "Hello";
 
-    // Generate AI reply
+  // Immediately acknowledge Chatwoot that message is being processed
+  res.json({ content: "..." });
+
+  try {
+    // Run OpenAI request in background
     const completion = await client.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a concise, friendly support assistant for Cenotrades. Answer clearly and briefly."
+          content:
+            "You are a concise, friendly support assistant for Cenotrades. Keep responses short, polite, and helpful."
         },
-        {
-          role: "user",
-          content: userMessage
-        }
+        { role: "user", content: userMessage }
       ],
-      temperature: 0.7,
-      max_tokens: 300
+      temperature: 0.5,
+      max_tokens: 200
     });
 
-    const reply = completion.choices[0].message.content;
+    const reply = completion.choices?.[0]?.message?.content || 
+      "I’m here to help with your questions about Cenotrades.";
 
-    // Respond in Chatwoot expected format
-    res.json({
-      content: reply
-    });
+    // Optional: Send reply to Chatwoot asynchronously
+    await fetch(req.body.webhook_url || "", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: reply })
+    }).catch(() => console.log("No Chatwoot reply URL provided."));
 
+    console.log("✅ Replied to Chatwoot:", reply);
   } catch (err) {
-    console.error("AI Bot error:", err);
-    res.json({ content: "Sorry, I’m having trouble responding right now." });
+    console.error("❌ AI Bot error:", err.message);
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`AI bot running on port ${PORT}`));
+app.listen(PORT, () => console.log(`⚡ Cenotrades AI bot running on port ${PORT}`));
